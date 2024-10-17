@@ -1,0 +1,7 @@
+root flask: http://127.0.0.1:5001/
+check neo4j connection: http://127.0.0.1:5001/check-neo4j
+localhost for neo4j: bolt://localhost:7687
+
+legge til/se biler:
+http://127.0.0.1:5001/
+
