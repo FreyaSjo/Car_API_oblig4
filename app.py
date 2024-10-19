@@ -293,10 +293,9 @@ def find_customer(customer_id): #find specific customer
 
 
 
-
 # INTERACTION ------------------------------------------------------------------------------------------------
 
-@app.route('/order_car', methods=['GET','PATCH'])
+@app.route('/order_car', methods=['GET','PATCH']) #order car
 def order_car():
 
     data = request.get_json()
@@ -333,7 +332,86 @@ def order_car():
             SET c.availability=$availability
         """, car_id=car_id, availability=rented_by)
 
-    return jsonify({'message':'car '+ str(car_id)+'rented by customer '+ str(customer_id)+'successfully'})
+    return jsonify({'message':'car '+ str(car_id)+'rented by customer '+ str(customer_id)+'successfully'}), 200
+
+@app.route('/return_car', methods=['GET', 'PATCH']) #return car
+def return_car():
+
+    data = request.get_json()
+    car_id = data['car_id']
+    customer_id = data['customer_id']
+    state = data['state']
+
+    car_exist = find_car(car_id)
+    customer_exist = find_customer(customer_id)
+
+    if not car_exist:
+        return jsonify({'message':'car not real!!!'}), 404
+
+    if car_exist['availability'] == 'available':
+        return jsonify({'message':'car not rented'}), 409
+
+    if not customer_exist:
+        return jsonify({'message':'this person only lives inside your head'}), 404
+
+    if customer_exist['status'] == 'available':
+        return jsonify({'message':'bros not busy'}), 409
+
+    if state.lower() != 'ok':
+        state = 'damaged'
+        status = 'barred'
+    else:
+        state = 'available'
+        status = 'available'
+
+    with driver.session() as session:
+        session.run("""
+            MATCH (c:Car {car_id: $car_id})
+            SET c.availability = $availability
+        """,car_id = car_id, availability = state)
+
+        session.run("""
+            MATCH (cus:Customer {customer_id: $customer_id})
+            SET cus.status = $status
+        """, customer_id = customer_id, status = status)
+
+    return jsonify({'message':'car '+str(car_id)+' returned by customer '+str(customer_id)}), 200
+
+@app.route('/cancel_car_order', methods=['GET', 'PATCH']) #cancel order
+def cancel_car():
+
+    data = request.get_json()
+    car_id = data['car_id']
+    customer_id = data['customer_id']
+
+    car_exist = find_car(car_id)
+    customer_exist = find_customer(customer_id)
+
+    if not car_exist:
+        return jsonify({'message': 'car not real!!!'}), 404
+
+    if car_exist['availability'] == 'available':
+        return jsonify({'message': 'car not rented'}), 409
+
+    if not customer_exist:
+        return jsonify({'message': 'this person only lives inside your head'}), 404
+
+    if customer_exist['status'] == 'available':
+        return jsonify({'message': 'bros not busy'}), 409
+
+    rent = 'available'
+    with driver.session() as session:
+        session.run("""
+            MATCH (c:Car {car_id: $car_id})
+            SET c.availability = $availability
+        """, car_id = car_id, availability = rent)
+
+        session.run("""
+            MATCH (cus:Customer {customer_id: $customer_id})
+            SET cus.status = $status
+        """,customer_id = customer_id, status = rent)
+
+    return jsonify({'message': 'car '+str(car_id)+' successfully cancelled by customer '+str(customer_id)}), 200
 
 # SYSTEM -----------------------------------------------------------------------------------------------------
 # ensure Neo4j driver is closed on app shutdown
