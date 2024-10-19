@@ -17,7 +17,7 @@ def close_driver():
 
 @app.route('/')
 def index():
-    return jsonify({"message": "Welcome to dumb rent car thing!!!!"})
+    return jsonify({"message": "Welcome car rental"})
 
 # Check Neo4j connection route
 @app.route('/check-neo4j', methods=['GET'])
@@ -47,7 +47,7 @@ def add_car():
     exists = find_car(car_id)
 
     if exists:
-        return jsonify({'message': 'denne finnes allerede, tulling :l'}), 409
+        return jsonify({'message': 'car with this ID already exists'}), 409
 
     with driver.session() as session: # starte session med neo4j
         # lage ny eller merge node med data fra dict
@@ -57,7 +57,7 @@ def add_car():
             ON CREATE SET c.location = $location, c.availability = $availability, c.make = $make, c.model = $model, c.year = $year
             """,car_id=car_id, make=make, model=model, year=year, location=location, availability=availability)
 
-    return jsonify({"message": "Car added successfully!"}), 201
+    return jsonify({"message": "Car added successfully"}), 201
 
 @app.route('/cars', methods=['GET']) # view all car instances
 def retrieve_car():
@@ -109,10 +109,10 @@ def update_car():
             SET c.location = $location, c.availability = $availability, c.make = $make, c.model = $model, c.year = $year
         """, car_id=car_id, make=make, model=model, year=year, availability=availability, location=location)
 
-        return jsonify({'message':'car new:)'}), 200
+        return jsonify({'message':'updated car info'}), 200
 
     else:
-        return jsonify({'message':'no car!!!!!:o'}), 404
+        return jsonify({'message':'car not found'}), 404
 
 @app.route('/cars', methods=['DELETE']) # delete car instance
 def remove_car():
@@ -129,10 +129,10 @@ def remove_car():
                 DELETE c
                 """, car_id=car_id)
 
-        return jsonify({"message": "Car removed successfully!"}), 204
+        return jsonify({"message": "Car removed successfully"}), 204
 
     else:
-        return jsonify({'message':'no car bby:('}), 404
+        return jsonify({'message':'car not found'}), 404
 
 # helper function
 def find_car(car_id): #find specific car
@@ -180,7 +180,7 @@ def add_customer():
     exists = find_customer(customer_id)
 
     if exists:
-        return jsonify({'message': 'denne finnes allerede, tulling :l'}), 409
+        return jsonify({'message': 'customer with this ID already exists'}), 409
 
     with driver.session() as session:
         session.run("""
@@ -188,7 +188,7 @@ def add_customer():
                 ON CREATE SET cus.name = $name, cus.age = $age, cus.adress = $adress, cus.status = $status
                 """, customer_id=customer_id, name=name, age=age, adress=adress, status=status)
 
-    return jsonify({"message": "Customer added successfully!"}), 201
+    return jsonify({"message": "Customer added successfully"}), 201
 
 @app.route('/customer', methods=['GET']) # view all customer instances
 def retrieve_customer():
@@ -238,10 +238,10 @@ def update_customer():
             SET cus.name = $name, cus.age = $age, cus.adress = $adress, cus.status = $status
                 """, customer_id=customer_id, name=name, age=age, adress=adress, status=status)
 
-        return jsonify({'message':'customer new:)'}), 200
+        return jsonify({'message':'customer info updated'}), 200
 
     else:
-        return jsonify({'message':'no customer!!!!!:o'}), 404
+        return jsonify({'message':'customer not found'}), 404
 
 @app.route('/customer', methods=['DELETE']) # delete customer instance
 def remove_customer():
@@ -258,10 +258,10 @@ def remove_customer():
                 DELETE cus
                 """, customer_id=customer_id)
 
-        return jsonify({"message": "Customer removed successfully!"}), 204
+        return jsonify({"message": "Customer removed successfully"}), 204
 
     else:
-        return jsonify({'message':'no customer bby:('}), 404
+        return jsonify({'message':'customer not found:('}), 404
 
 # helper function
 def find_customer(customer_id): #find specific customer
@@ -308,7 +308,7 @@ def add_employee():
     exists = find_employee(employee_id)
 
     if exists:
-        return jsonify({'message': 'denne finnes allerede, tulling :l'}), 409
+        return jsonify({'message': 'employee with this ID already exists'}), 409
 
     with driver.session() as session:
         session.run("""
@@ -316,7 +316,7 @@ def add_employee():
                 ON CREATE SET e.name = $name, e.age = $age, e.adress = $adress, e.branch = $branch
                 """, employee_id=employee_id, name=name, age=age, adress=adress, branch=branch)
 
-    return jsonify({"message": "Employee added successfully!"}), 201
+    return jsonify({"message": "Employee added successfully"}), 201
 
 @app.route('/employee', methods=['GET']) # view all employee instances
 def retrieve_employee():
@@ -366,10 +366,10 @@ def update_employee():
             SET e.name = $name, e.age = $age, e.adress = $adress, e.branch = $branch
                 """, employee_id=employee_id, name=name, age=age, adress=adress, branch=branch)
 
-        return jsonify({'message':'employee new:)'}), 200
+        return jsonify({'message':'employee info updated'}), 200
 
     else:
-        return jsonify({'message':'no employee!!!!!:o'}), 404
+        return jsonify({'message':'employee not found'}), 404
 
 @app.route('/employee', methods=['DELETE']) # delete employee instance
 def remove_employee():
@@ -386,10 +386,10 @@ def remove_employee():
                 DELETE e
                 """, employee_id=employee_id)
 
-        return jsonify({"message": "employee removed successfully!"}), 204
+        return jsonify({"message": "employee removed successfully"}), 204
 
     else:
-        return jsonify({'message':'no employee bby:('}), 404
+        return jsonify({'message':'employee not found'}), 404
 
 # helper function
 def find_employee(employee_id): #find specific employee
@@ -433,16 +433,16 @@ def order_car():
     customer_exist = find_customer(customer_id)
 
     if not car_exist:
-        return jsonify({'message':'car not real!!!'}), 404
+        return jsonify({'message':'car not found'}), 404
 
     if car_exist['availability'].lower() != 'available':
         return jsonify({'message':'car not available for rental'}), 409
 
     if not customer_exist:
-        return jsonify({'message':'this person only lives inside your head'}), 404
+        return jsonify({'message':'customer not found'}), 404
 
     if customer_exist['status'] != 'available':
-        return jsonify({'message':'bros busy'}), 409
+        return jsonify({'message':'customer already rents a car'}), 409
 
 
     rented = 'rents car '+str(car_id)
@@ -473,16 +473,16 @@ def return_car():
     customer_exist = find_customer(customer_id)
 
     if not car_exist:
-        return jsonify({'message':'car not real!!!'}), 404
+        return jsonify({'message':'car not found'}), 404
 
     if car_exist['availability'].lower() == 'available':
         return jsonify({'message':'car not rented'}), 409
 
     if not customer_exist:
-        return jsonify({'message':'this person only lives inside your head'}), 404
+        return jsonify({'message':'customer not found'}), 404
 
     if customer_exist['status'].lower() == 'available':
-        return jsonify({'message':'bros not busy'}), 409
+        return jsonify({'message':'customer not registered to a car'}), 409
 
     if state.lower() != 'ok':
         state = 'damaged'
@@ -521,10 +521,10 @@ def cancel_car():
         return jsonify({'message': 'car not rented'}), 409
 
     if not customer_exist:
-        return jsonify({'message': 'this person only lives inside your head'}), 404
+        return jsonify({'message': 'customer not found'}), 404
 
     if customer_exist['status'].lower() == 'available':
-        return jsonify({'message': 'bros not busy'}), 409
+        return jsonify({'message': 'customer not registered to a car'}), 409
 
     rent = 'available'
     with driver.session() as session:
