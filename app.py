@@ -47,7 +47,7 @@ def add_car():
     exists = find_car(car_id)
 
     if exists:
-        return jsonify({'message': 'denne finnes allerede, tulling :l'}), 200
+        return jsonify({'message': 'denne finnes allerede, tulling :l'}), 409
 
     with driver.session() as session: # starte session med neo4j
         # lage ny eller merge node med data fra dict
@@ -175,22 +175,95 @@ def add_customer():
     name = data['name']
     age = data['age']
     adress = data['adress']
+    status = data['status']
 
     exists = find_customer(customer_id)
 
     if exists:
-        return jsonify({'message': 'denne finnes allerede, tulling :l'}), 200
+        return jsonify({'message': 'denne finnes allerede, tulling :l'}), 409
 
     with driver.session() as session:
         session.run("""
                 MERGE (cus:Customer {customer_id: $customer_id})
-                ON CREATE SET c.name = $name, c.age = $age, c.adress = $adress
-                """, customer_id=customer_id, name=name, age=age, adress=adress)
+                ON CREATE SET cus.name = $name, cus.age = $age, cus.adress = $adress, cus.status = $status
+                """, customer_id=customer_id, name=name, age=age, adress=adress, status=status)
 
     return jsonify({"message": "Customer added successfully!"}), 201
 
+@app.route('/customer', methods=['GET']) # view all customer instances
+def retrieve_customer():
 
+    with driver.session() as session:
+        result = session.run('MATCH (cus:Customer) RETURN cus')
 
+        customers = []
+
+        for record in result:
+
+            customer_node = record['cus']
+
+            customer_data = {
+                'customer_id': customer_node['customer_id'],
+                'name': customer_node['name'],
+                'age': customer_node['age'],
+                'adress': customer_node['adress'],
+                'status': customer_node['status']
+            }
+
+            customers.append(customer_data)
+
+    return jsonify(customers)
+
+@app.route('/customer', methods=['PATCH']) # update customer info
+def update_customer():
+
+    data = request.get_json()
+    customer_id = data['customer_id']
+    name = data['name']
+    age = data['age']
+    adress = data['adress']
+    status = data['status']
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (cus:Customer {customer_id: $customer_id})
+            RETURN cus
+        """, customer_id=customer_id)
+
+    customer = result.single()
+
+    if customer:
+        session.run("""
+            MATCH (cus:Customer {customer_id: $customer_id})
+            SET cus.name = $name, cus.age = $age, cus.adress = $adress, cus.status = $status
+                """, customer_id=customer_id, name=name, age=age, adress=adress, status=status)
+
+        return jsonify({'message':'customer new:)'}), 200
+
+    else:
+        return jsonify({'message':'no customer!!!!!:o'}), 404
+
+@app.route('/customer', methods=['DELETE']) # delete customer instance
+def remove_customer():
+
+    data = request.get_json()
+    customer_id = data['customer_id']
+
+    exists = find_customer(customer_id)
+
+    if exists:
+        with driver.session() as session:
+            session.run("""
+                MATCH (cus:Customer {customer_id: $customer_id})
+                DELETE cus
+                """, customer_id=customer_id)
+
+        return jsonify({"message": "Customer removed successfully!"}), 204
+
+    else:
+        return jsonify({'message':'no customer bby:('}), 404
+
+# helper function
 def find_customer(customer_id): #find specific customer
 
     with driver.session() as session:
@@ -209,7 +282,8 @@ def find_customer(customer_id): #find specific customer
                 'customer_id': customer_node['customer_id'],
                 'name': customer_node['name'],
                 'age': customer_node['age'],
-                'adress': customer_node['adress']
+                'adress': customer_node['adress'],
+                'status': customer_node['status']
                 }
 
             return customer_data
@@ -217,6 +291,49 @@ def find_customer(customer_id): #find specific customer
         else:
             return None
 
+
+
+
+# INTERACTION ------------------------------------------------------------------------------------------------
+
+@app.route('/order_car', methods=['GET','PATCH'])
+def order_car():
+
+    data = request.get_json()
+    customer_id = data['customer_id']
+    car_id = data['car_id']
+
+    car_exist = find_car(car_id)
+    customer_exist = find_customer(customer_id)
+
+    if not car_exist:
+        return jsonify({'message':'car not real!!!'}), 404
+
+    if car_exist['availability'] != 'available':
+        return jsonify({'message':'car not available for rental'}), 409
+
+    if not customer_exist:
+        return jsonify({'message':'this person only lives inside your head'}), 404
+
+    if customer_exist['status'] != 'available':
+        return jsonify({'message':'bros busy'}), 409
+
+
+    rented = 'rents_'+str(car_id)
+    rented_by = 'customer_'+str(customer_id)
+
+    with driver.session() as session:
+        session.run("""
+            MATCH (cus:Customer {customer_id: $customer_id})
+            SET cus.status=$status
+        """, customer_id=customer_id, status=rented)
+
+        session.run("""
+            MATCH (c:Car {car_id: $car_id})
+            SET c.availability=$availability
+        """, car_id=car_id, availability=rented_by)
+
+    return jsonify({'message':'car '+ str(car_id)+'rented by customer '+ str(customer_id)+'successfully'})
 
 # SYSTEM -----------------------------------------------------------------------------------------------------
 # ensure Neo4j driver is closed on app shutdown
