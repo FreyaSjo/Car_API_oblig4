@@ -293,6 +293,133 @@ def find_customer(customer_id): #find specific customer
 
 
 
+# EMPLOYEES --------------------------------------------------------------------------------------------------
+
+@app.route('/employee', methods=['POST']) # create employee instance
+def add_employee():
+
+    data = request.get_json()
+    employee_id = data['employee_id']
+    name = data['name']
+    age = data['age']
+    adress = data['adress']
+    branch = data['branch']
+
+    exists = find_employee(employee_id)
+
+    if exists:
+        return jsonify({'message': 'denne finnes allerede, tulling :l'}), 409
+
+    with driver.session() as session:
+        session.run("""
+                MERGE (e:Employee {employee_id: $employee_id})
+                ON CREATE SET e.name = $name, e.age = $age, e.adress = $adress, e.branch = $branch
+                """, employee_id=employee_id, name=name, age=age, adress=adress, branch=branch)
+
+    return jsonify({"message": "Employee added successfully!"}), 201
+
+@app.route('/employee', methods=['GET']) # view all employee instances
+def retrieve_employee():
+
+    with driver.session() as session:
+        result = session.run('MATCH (e:Employee) RETURN e')
+
+        employees = []
+
+        for record in result:
+
+            employee_node = record['e']
+
+            employee_data = {
+                'employee_id': employee_node['employee_id'],
+                'name': employee_node['name'],
+                'age': employee_node['age'],
+                'adress': employee_node['adress'],
+                'branch': employee_node['branch']
+            }
+
+            employees.append(employee_data)
+
+    return jsonify(employees)
+
+@app.route('/employee', methods=['PATCH']) # update employee info
+def update_employee():
+
+    data = request.get_json()
+    employee_id = data['employee_id']
+    name = data['name']
+    age = data['age']
+    adress = data['adress']
+    branch = data['branch']
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (e:Employee {employee_id: $employee_id})
+            RETURN e
+        """, employee_id=employee_id)
+
+    employee = result.single()
+
+    if employee:
+        session.run("""
+            MATCH (e:Employee {employee_id: $employee_id})
+            SET e.name = $name, e.age = $age, e.adress = $adress, e.branch = $branch
+                """, employee_id=employee_id, name=name, age=age, adress=adress, branch=branch)
+
+        return jsonify({'message':'employee new:)'}), 200
+
+    else:
+        return jsonify({'message':'no employee!!!!!:o'}), 404
+
+@app.route('/employee', methods=['DELETE']) # delete employee instance
+def remove_employee():
+
+    data = request.get_json()
+    employee_id = data['employee_id']
+
+    exists = find_employee(employee_id)
+
+    if exists:
+        with driver.session() as session:
+            session.run("""
+                MATCH (e:Employee {employee_id: $employee_id})
+                DELETE e
+                """, employee_id=employee_id)
+
+        return jsonify({"message": "employee removed successfully!"}), 204
+
+    else:
+        return jsonify({'message':'no employee bby:('}), 404
+
+# helper function
+def find_employee(employee_id): #find specific employee
+
+    with driver.session() as session:
+        result = session.run("""
+                MATCH (e:Employee {employee_id: $employee_id})
+                RETURN e
+            """, employee_id=employee_id)
+
+        employee = result.single()
+
+        if employee:
+
+            employee_node = employee['e']
+
+            employee_data = {
+                'employee_id': employee_node['employee_id'],
+                'name': employee_node['name'],
+                'age': employee_node['age'],
+                'adress': employee_node['adress'],
+                'branch': employee_node['branch']
+            }
+
+            return employee_data
+
+        else:
+            return None
+
+
 # INTERACTION ------------------------------------------------------------------------------------------------
 
 @app.route('/order_car', methods=['GET','PATCH']) #order car
@@ -308,7 +435,7 @@ def order_car():
     if not car_exist:
         return jsonify({'message':'car not real!!!'}), 404
 
-    if car_exist['availability'] != 'available':
+    if car_exist['availability'].lower() != 'available':
         return jsonify({'message':'car not available for rental'}), 409
 
     if not customer_exist:
@@ -318,8 +445,8 @@ def order_car():
         return jsonify({'message':'bros busy'}), 409
 
 
-    rented = 'rents_'+str(car_id)
-    rented_by = 'customer_'+str(customer_id)
+    rented = 'rents car '+str(car_id)
+    rented_by = 'rented by customer '+str(customer_id)
 
     with driver.session() as session:
         session.run("""
@@ -332,7 +459,7 @@ def order_car():
             SET c.availability=$availability
         """, car_id=car_id, availability=rented_by)
 
-    return jsonify({'message':'car '+ str(car_id)+'rented by customer '+ str(customer_id)+'successfully'}), 200
+    return jsonify({'message':'car '+ str(car_id)+' rented by customer '+ str(customer_id)+' successfully'}), 200
 
 @app.route('/return_car', methods=['GET', 'PATCH']) #return car
 def return_car():
@@ -348,13 +475,13 @@ def return_car():
     if not car_exist:
         return jsonify({'message':'car not real!!!'}), 404
 
-    if car_exist['availability'] == 'available':
+    if car_exist['availability'].lower() == 'available':
         return jsonify({'message':'car not rented'}), 409
 
     if not customer_exist:
         return jsonify({'message':'this person only lives inside your head'}), 404
 
-    if customer_exist['status'] == 'available':
+    if customer_exist['status'].lower() == 'available':
         return jsonify({'message':'bros not busy'}), 409
 
     if state.lower() != 'ok':
@@ -390,13 +517,13 @@ def cancel_car():
     if not car_exist:
         return jsonify({'message': 'car not real!!!'}), 404
 
-    if car_exist['availability'] == 'available':
+    if car_exist['availability'].lower() == 'available':
         return jsonify({'message': 'car not rented'}), 409
 
     if not customer_exist:
         return jsonify({'message': 'this person only lives inside your head'}), 404
 
-    if customer_exist['status'] == 'available':
+    if customer_exist['status'].lower() == 'available':
         return jsonify({'message': 'bros not busy'}), 409
 
     rent = 'available'
