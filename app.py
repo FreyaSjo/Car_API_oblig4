@@ -422,7 +422,7 @@ def find_employee(employee_id): #find specific employee
 
 # INTERACTION ------------------------------------------------------------------------------------------------
 
-@app.route('/order_car', methods=['GET','PATCH']) #order car
+@app.route('/order_car', methods=['POST']) #order car
 def order_car():
 
     data = request.get_json()
@@ -436,14 +436,49 @@ def order_car():
         return jsonify({'message':'car not found'}), 404
 
     if car_exist['availability'].lower() != 'available':
-        return jsonify({'message':'car not available for rental'}), 409
+        return jsonify({'message':'car not available for booking'}), 409
 
     if not customer_exist:
         return jsonify({'message':'customer not found'}), 404
 
     if customer_exist['status'] != 'available':
-        return jsonify({'message':'customer already rents a car'}), 409
+        return jsonify({'message':'customer already booked or rented a car'}), 409
 
+
+    booked = 'booked car '+str(car_id)
+    booked_by = 'booked by customer '+str(customer_id)
+
+    with driver.session() as session:
+        session.run("""
+            MATCH (cus:Customer {customer_id: $customer_id})
+            SET cus.status=$status
+        """, customer_id=customer_id, status=booked)
+
+        session.run("""
+            MATCH (c:Car {car_id: $car_id})
+            SET c.availability=$availability
+        """, car_id=car_id, availability=booked_by)
+
+    return jsonify({'message':'car '+ str(car_id)+' booked by customer '+ str(customer_id)+' successfully'}), 200
+
+@app.route('/rent_car', methods=['POST']) #rent car
+def rent_car():
+
+    data = request.get_json()
+    customer_id = data['customer_id']
+    car_id = data['car_id']
+
+    car_exist = find_car(car_id)
+    customer_exist = find_customer(customer_id)
+
+    if not car_exist:
+        return jsonify({'message':'car not found'}), 404
+
+    if car_exist['availability'].lower() != f'booked by customer {customer_id}': # if the car is not booked by the customer
+        return jsonify({'message':'car not booked by this customer'}), 409
+
+    if not customer_exist:
+        return jsonify({'message':'customer not found'}), 404
 
     rented = 'rents car '+str(car_id)
     rented_by = 'rented by customer '+str(customer_id)
@@ -461,7 +496,7 @@ def order_car():
 
     return jsonify({'message':'car '+ str(car_id)+' rented by customer '+ str(customer_id)+' successfully'}), 200
 
-@app.route('/return_car', methods=['GET', 'PATCH']) #return car
+@app.route('/return_car', methods=['PATCH']) #return car
 def return_car():
 
     data = request.get_json()
@@ -504,7 +539,7 @@ def return_car():
 
     return jsonify({'message':'car '+str(car_id)+' returned by customer '+str(customer_id)}), 200
 
-@app.route('/cancel_car_order', methods=['GET', 'PATCH']) #cancel order
+@app.route('/cancel_car_order', methods=['PATCH']) #cancel order
 def cancel_car():
 
     data = request.get_json()
